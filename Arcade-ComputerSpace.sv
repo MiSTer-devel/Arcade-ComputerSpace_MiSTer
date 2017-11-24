@@ -240,8 +240,17 @@ assign rm = rs + ro + rc;
 assign gm = gs + go + gc;
 assign bm = bs + bo + bc;
 
-assign r = (rm[5:4] ? 4'b1111 : rm[3:0]) ^ {4{video[3]}};
-assign g = (gm[5:4] ? 4'b1111 : gm[3:0]) ^ {4{video[3]}};
-assign b = (bm[5:4] ? 4'b1111 : bm[3:0]) ^ {4{video[3]}};
+assign r = (rm[5:4] ? 4'b1111 : rm[3:0]) ^ {4{inv}};
+assign g = (gm[5:4] ? 4'b1111 : gm[3:0]) ^ {4{inv}};
+assign b = (bm[5:4] ? 4'b1111 : bm[3:0]) ^ {4{inv}};
+
+reg inv;
+always @(posedge clk_5m) begin
+	reg old_vs, cur_inv;
+	old_vs <= vs;
+	
+	cur_inv <= cur_inv | video[3];
+	if (~old_vs & vs) {inv,cur_inv} <= {cur_inv, 1'b0};
+end
 
 endmodule
