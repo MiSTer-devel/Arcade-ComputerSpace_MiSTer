@@ -114,7 +114,7 @@ localparam CONF_STR = {
 	"-;",
 	"T6,Reset;",
 	"J,Thrust,Fire,Start;",
-	"V,v1.00.",`BUILD_DATE
+	"V,v1.10.",`BUILD_DATE
 };
 
 ////////////////////   CLOCKS   ///////////////////
@@ -187,7 +187,8 @@ wire m_thrust = btn_thrust | joy[4];
 wire m_fire   = btn_fire   | joy[5];
 wire m_start  = btn_start  | joy[6];
 
-wire video, blank;
+wire [3:0] video;
+wire blank;
 wire vs,hs;
 
 assign CLK_VIDEO = clk_5m;
@@ -195,9 +196,9 @@ assign CE_PIXEL = 1;
 
 assign VGA_HS = hs;
 assign VGA_VS = vs;
-assign VGA_R = {8{video}};
-assign VGA_G = {8{video}};
-assign VGA_B = {8{video}};
+assign VGA_R = {video,video};
+assign VGA_G = {video,video};
+assign VGA_B = {video,video};
 assign VGA_DE = ~blank;
 
 wire [15:0] audio;
@@ -221,9 +222,25 @@ computer_space_top computerspace
 	.hsync(hs),
 	.vsync(vs),
 	.blank(blank),
-	.video(video),
+	.video(vraw),
 
-	.wav_out(audio)
+	.audio(audio)
 );
+
+wire [3:0] vraw;
+wire [3:0] normal_video,inverse_video;
+
+always_comb begin
+	normal_video = 4'b1111;
+	case(vraw[2:0])
+		0: normal_video = 4'b0000;
+		1: normal_video = 4'b0101;
+		2: normal_video = 4'b1000;
+		3: normal_video = 4'b1000;
+	endcase
+	
+	inverse_video = !vraw[2:0] ? 4'b0111 : 4'b0000;
+	video = vraw[3] ? inverse_video : normal_video;
+end
 
 endmodule
