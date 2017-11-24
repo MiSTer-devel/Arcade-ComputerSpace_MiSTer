@@ -111,6 +111,7 @@ localparam CONF_STR = {
 	"A.COMSPC;;",
 	"-;",
 	"O1,Aspect ratio,4:3,16:9;",
+	"O2,Color,No,Yes;",
 	"-;",
 	"T6,Reset;",
 	"J,Thrust,Fire,Start;",
@@ -187,7 +188,6 @@ wire m_thrust = btn_thrust | joy[4];
 wire m_fire   = btn_fire   | joy[5];
 wire m_start  = btn_start  | joy[6];
 
-wire [3:0] video;
 wire blank;
 wire vs,hs;
 
@@ -196,9 +196,9 @@ assign CE_PIXEL = 1;
 
 assign VGA_HS = hs;
 assign VGA_VS = vs;
-assign VGA_R = {video,video};
-assign VGA_G = {video,video};
-assign VGA_B = {video,video};
+assign VGA_R = {r,r};
+assign VGA_G = {g,g};
+assign VGA_B = {b,b};
 assign VGA_DE = ~blank;
 
 wire [15:0] audio;
@@ -222,25 +222,26 @@ computer_space_top computerspace
 	.hsync(hs),
 	.vsync(vs),
 	.blank(blank),
-	.video(vraw),
+	.video(video),
 
 	.audio(audio)
 );
 
-wire [3:0] vraw;
-wire [3:0] normal_video,inverse_video;
+wire [3:0] video;
 
-always_comb begin
-	normal_video = 4'b1111;
-	case(vraw[2:0])
-		0: normal_video = 4'b0000;
-		1: normal_video = 4'b0101;
-		2: normal_video = 4'b1000;
-		3: normal_video = 4'b1000;
-	endcase
-	
-	inverse_video = !vraw[2:0] ? 4'b0111 : 4'b0000;
-	video = vraw[3] ? inverse_video : normal_video;
-end
+wire [5:0] rs,gs,bs, ro,go,bo, rc,gc,bc, rm,gm,bm;
+wire [3:0] r,g,b;
+
+assign {rs,gs,bs} = ~video[0] ? 18'd0 : status[2] ? {6'b0111,6'b0111,6'b0111} : {6'b0111,6'b0111,6'b0111};
+assign {rc,gc,bc} = ~video[1] ? 18'd0 : status[2] ? {6'b0000,6'b1111,6'b1111} : {6'b0111,6'b0111,6'b0111};
+assign {ro,go,bo} = ~video[2] ? 18'd0 : status[2] ? {6'b1111,6'b1111,6'b0000} : {6'b1111,6'b1111,6'b1111};
+
+assign rm = rs + ro + rc;
+assign gm = gs + go + gc;
+assign bm = bs + bo + bc;
+
+assign r = (rm[5:4] ? 4'b1111 : rm[3:0]) ^ {4{video[3]}};
+assign g = (gm[5:4] ? 4'b1111 : gm[3:0]) ^ {4{video[3]}};
+assign b = (bm[5:4] ? 4'b1111 : bm[3:0]) ^ {4{video[3]}};
 
 endmodule
