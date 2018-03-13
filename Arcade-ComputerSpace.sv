@@ -29,18 +29,14 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [43:0] HPS_BUS,
+	inout  [44:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
-	output        CLK_VIDEO,
+	output        VGA_CLK,
 
-	//Multiple resolutions are supported using different CE_PIXEL rates.
+	//Multiple resolutions are supported using different VGA_CE rates.
 	//Must be based on CLK_VIDEO
-	output        CE_PIXEL,
-
-	//Video aspect ratio for HDMI. Most retro systems have ratio 4:3.
-	output  [7:0] VIDEO_ARX,
-	output  [7:0] VIDEO_ARY,
+	output        VGA_CE,
 
 	output  [7:0] VGA_R,
 	output  [7:0] VGA_G,
@@ -49,9 +45,28 @@ module emu
 	output        VGA_VS,
 	output        VGA_DE,    // = ~(VBlank | HBlank)
 
+	//Base video clock. Usually equals to CLK_SYS.
+	output        HDMI_CLK,
+
+	//Multiple resolutions are supported using different HDMI_CE rates.
+	//Must be based on CLK_VIDEO
+	output        HDMI_CE,
+
+	output  [7:0] HDMI_R,
+	output  [7:0] HDMI_G,
+	output  [7:0] HDMI_B,
+	output        HDMI_HS,
+	output        HDMI_VS,
+	output        HDMI_DE,   // = ~(VBlank | HBlank)
+	output  [1:0] HDMI_SL,   // scanlines fx
+
+	//Video aspect ratio for HDMI. Most retro systems have ratio 4:3.
+	output  [7:0] HDMI_ARX,
+	output  [7:0] HDMI_ARY,
+
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
-	// b[1]: 0 - LED status is system status ORed with b[0]
+	// b[1]: 0 - LED status is system status OR'd with b[0]
 	//       1 - LED status is controled solely by b[0]
 	// hint: supply 2'b00 to let the system control the LED.
 	output  [1:0] LED_POWER,
@@ -59,52 +74,15 @@ module emu
 
 	output [15:0] AUDIO_L,
 	output [15:0] AUDIO_R,
-	output        AUDIO_S, // 1 - signed audio samples, 0 - unsigned
-	input         TAPE_IN,
-
-	// SD-SPI
-	output        SD_SCK,
-	output        SD_MOSI,
-	input         SD_MISO,
-	output        SD_CS,
-
-	//High latency DDR3 RAM interface
-	//Use for non-critical time purposes
-	output        DDRAM_CLK,
-	input         DDRAM_BUSY,
-	output  [7:0] DDRAM_BURSTCNT,
-	output [28:0] DDRAM_ADDR,
-	input  [63:0] DDRAM_DOUT,
-	input         DDRAM_DOUT_READY,
-	output        DDRAM_RD,
-	output [63:0] DDRAM_DIN,
-	output  [7:0] DDRAM_BE,
-	output        DDRAM_WE,
-
-	//SDRAM interface with lower latency
-	output        SDRAM_CLK,
-	output        SDRAM_CKE,
-	output [12:0] SDRAM_A,
-	output  [1:0] SDRAM_BA,
-	inout  [15:0] SDRAM_DQ,
-	output        SDRAM_DQML,
-	output        SDRAM_DQMH,
-	output        SDRAM_nCS,
-	output        SDRAM_nCAS,
-	output        SDRAM_nRAS,
-	output        SDRAM_nWE
+	output        AUDIO_S    // 1 - signed audio samples, 0 - unsigned
 );
-
-assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0; 
-assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
-assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
 
 assign LED_USER  = 0;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 
-assign VIDEO_ARX = status[1] ? 8'd16 : 8'd4;
-assign VIDEO_ARY = status[1] ? 8'd9  : 8'd3; 
+assign HDMI_ARX = status[1] ? 8'd16 : 8'd4;
+assign HDMI_ARY = status[1] ? 8'd9  : 8'd3;
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -123,7 +101,7 @@ localparam CONF_STR = {
 wire clk_sys = CLK_50M;
 wire clk_5m;
 wire pll_locked;
-		
+
 pll pll
 (
 	.refclk(CLK_50M),
@@ -157,14 +135,13 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.ps2_key(ps2_key)
 );
 
-wire pressed    = (ps2_key[15:8] != 8'hf0);
-wire extended   = (~pressed ? (ps2_key[23:16] == 8'he0) : (ps2_key[15:8] == 8'he0));
-wire [8:0] code = ps2_key[63:24] ? 9'd0 : {extended, ps2_key[7:0]}; // filter out PRNSCR and PAUSE
+wire       pressed = ps2_key[9];
+wire [8:0] code    = ps2_key[8:0];
 always @(posedge clk_sys) begin
 	reg old_state;
-	old_state <= ps2_key[64];
+	old_state <= ps2_key[10];
 	
-	if(old_state != ps2_key[64]) begin
+	if(old_state != ps2_key[10]) begin
 		casex(code)
 			'hX6B: btn_left   <= pressed; // left
 			'hX74: btn_right  <= pressed; // right
@@ -191,15 +168,24 @@ wire m_start  = btn_start  | joy[6];
 wire blank;
 wire vs,hs;
 
-assign CLK_VIDEO = clk_5m;
-assign CE_PIXEL = 1;
+assign VGA_CLK  = clk_5m;
+assign VGA_CE   = 1;
+assign VGA_HS   = hs;
+assign VGA_VS   = vs;
+assign VGA_R    = {r,r};
+assign VGA_G    = {g,g};
+assign VGA_B    = {b,b};
+assign VGA_DE   = ~blank;
 
-assign VGA_HS = hs;
-assign VGA_VS = vs;
-assign VGA_R = {r,r};
-assign VGA_G = {g,g};
-assign VGA_B = {b,b};
-assign VGA_DE = ~blank;
+assign HDMI_CLK = VGA_CLK;
+assign HDMI_CE  = 1;
+assign HDMI_HS  = VGA_HS;
+assign HDMI_VS  = VGA_VS;
+assign HDMI_R   = VGA_R;
+assign HDMI_G   = VGA_G;
+assign HDMI_B   = VGA_B;
+assign HDMI_DE  = VGA_DE;
+assign HDMI_SL  = 0;
 
 wire [15:0] audio;
 assign AUDIO_L = audio;
