@@ -91,9 +91,9 @@ localparam CONF_STR = {
 	"O1,Aspect ratio,4:3,16:9;",
 	"O2,Color,No,Yes;",
 	"-;",
-	"T6,Reset;",
-	"J,Thrust,Fire,Start;",
-	"V,v1.10.",`BUILD_DATE
+	"R0,Reset;",
+	"J1,Thrust,Fire,Start;",
+	"V,v",`BUILD_DATE
 };
 
 ////////////////////   CLOCKS   ///////////////////
@@ -149,6 +149,8 @@ always @(posedge clk_sys) begin
 			'h014: btn_fire   <= pressed; // ctrl
 
 			'h005: btn_start  <= pressed; // F1
+			// JPAC/IPAC/MAME Style Codes
+			'h016: btn_start  <= pressed; // 1
 		endcase
 	end
 end
@@ -194,7 +196,7 @@ assign AUDIO_S = 1;
 
 computer_space_top computerspace
 (
-	.reset(RESET | buttons[1] | status[0] | status[6]),
+	.reset(RESET | buttons[1] | status[0] ),
 
 	.clock_50(clk_sys),
 	.game_clk(clk_5m),
