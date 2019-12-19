@@ -101,7 +101,8 @@ entity computer_space_top is
 
 		hsync				: out std_logic;
 		vsync				: out std_logic;
-		blank				: out std_logic;
+		hblank			: out std_logic;
+		vblank			: out std_logic;
 		video 			: out std_logic_vector(3 downto 0);
 		
 		audio          : out integer range -32768 to 32767
@@ -142,7 +143,7 @@ component computer_space_logic is
 	signal_thrust, signal_fire,
 	signal_cw, signal_ccw  						: in std_logic;
 	composite_video_signal					 	: out std_logic_vector(3 downto 0);
-	blank												: out std_logic;
+	hblank,vblank									: out std_logic;
 	hsync												: out std_logic;
 	vsync												: out std_logic;
 	audio_gate										: out std_logic;
@@ -229,7 +230,7 @@ rocket_missile_life_time_duration, saucer_missile_life_time_duration,
 saucer_missile_hold_duration, signal_delay_duration,
 thrust_and_rotate_clk, explosion_rotate_clk, 
 signal_start, signal_start, signal_thrust, signal_fire,
-signal_cw,signal_ccw, video, blank,
+signal_cw,signal_ccw, video, hblank, vblank,
 hsync, vsync,
 audio_gate, sound_switch, saucer_missile_sound,rocket_missile_sound,
 turn_sound

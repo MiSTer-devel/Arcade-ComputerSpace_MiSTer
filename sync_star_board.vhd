@@ -122,7 +122,7 @@ entity sync_star_board is
 	hsync								: out std_logic;
 	vsync								: out std_logic;
 	composite_video_signal  	: out std_logic_vector(3 downto 0);
-	blank								: out std_logic
+	hblank,vblank					: out std_logic
 	);
 
 end sync_star_board;
@@ -137,7 +137,7 @@ component scan_counter is
 	vsync												: out std_logic;
 	star_video_out 								: out std_logic;
 	count_enable 									: out std_logic;
-	blank												: out std_logic;	
+	hblank,vblank									: out std_logic;	
 	b2_12 											: out std_logic; 
 	vertical, horizontal 						: out std_logic_vector (7 downto 0)
 	);
@@ -326,7 +326,7 @@ SB_Y  <= not b2_12; -- new
 -----------------------------------------------------------------------------
 sync_and_stars: component scan_counter
 	port map(game_clk, hsync, vsync, star_video,
-	count_enable, blank, b2_12, vertical_position,
+	count_enable, hblank, vblank, b2_12, vertical_position,
 	horizontal_position);
 
 a1_15 <= star_video; 

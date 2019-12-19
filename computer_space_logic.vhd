@@ -56,7 +56,7 @@ entity computer_space_logic is
 	-- signals; to send via gpio
 	-- to TV (via resistor circuitry)
 	composite_video_signal						: out std_logic_vector(3 downto 0);
-	blank												: out std_logic;
+	hblank,vblank									: out std_logic;
 
 	hsync												: out std_logic;
 	vsync												: out std_logic;
@@ -94,7 +94,7 @@ component sync_star_board
 	hsync												: out std_logic;
 	vsync												: out std_logic;
 	composite_video_signal 					 	: out std_logic_vector(3 downto 0);
-	blank												: out std_logic  
+	hblank,vblank									: out std_logic  
 	);																		
 end component;
 
@@ -195,7 +195,7 @@ Sync_Star_Brd : sync_star_board
 port map (reset, game_clk, super_clk, explosion_clk, seconds_clk,
 SB_3, SB_4, SB_6, SB_7, SB_C, SB_E, SB_N,
 SB_2, SB_5, SB_H, SB_K, SB_L, SB_M, SB_Y, hsync, vsync,
-composite_video_signal, blank);
+composite_video_signal, hblank, vblank);
 
 -----------------------------------------------------------------------------
 -- MOTION BOARD											            					--

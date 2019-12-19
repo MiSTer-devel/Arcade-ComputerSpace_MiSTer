@@ -30,7 +30,7 @@ entity scan_counter is
 	vsync												: out std_logic;
 	star_video_out,
 	count_enable 									: out std_logic:= '0';
-	blank												: out std_logic:= '1';	
+	hblank, vblank									: out std_logic;
 	b2_12 											: out std_logic;  
 	vertical, horizontal 						: out std_logic_vector (7 downto 0)
 	);	
@@ -63,7 +63,7 @@ signal hor_scan_q		 							: std_logic_vector (7 downto 0)
 signal ver_scan_q		 							: std_logic_vector (7 downto 0)
 														:= "00000001";	
 
-signal hblank, vblank			  				: std_logic;
+--signal hblank, vblank			  				: std_logic;
 											
 -- signals for star generation logic
 signal b5_10, b1_6, b1_5, b1_4  				: std_logic;
@@ -166,6 +166,9 @@ if rising_edge (game_clk) then
 				hblank <= '1';
 				if vcount = 239 then vblank <= '1'; end if;
 
+				if vcount = 244 then vsync <= '1'; end if;
+				if vcount = 248 then vsync <= '0'; end if;
+
 				if vcount < 254 then				-- Increase vertical count
 					vcount <= vcount + 1;
 					ver_scan_q <= ver_scan_q +1;
@@ -207,13 +210,13 @@ b2_6 <= not f1_15;
 -----------------------------------------------------------------------------	
 -- CREATING THE SYNC SIGNAL								 								--
 -----------------------------------------------------------------------------			
-vsync <= vblank;
+-- vsync <= vblank;
 
 -----------------------------------------------------------------------------	
 -- COUNT ENABLE & BLANK									 									--
 -----------------------------------------------------------------------------	
 count_enable	<= c4_14;
-blank 			<= hblank or vblank;
+--blank 			<= hblank or vblank;
 
 -----------------------------------------------------------------------------	
 -- SCAN COUNTER VALUES									 									--

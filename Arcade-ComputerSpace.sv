@@ -2,7 +2,7 @@
 //  Arcade: Computer Space
 //
 //  Port to MiSTer
-//  Copyright (C) 2017 Sorgelig
+//  Copyright (C) 2017-2019 Sorgelig
 //
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
@@ -29,7 +29,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [44:0] HPS_BUS,
+	inout  [45:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        VGA_CLK,
@@ -44,6 +44,7 @@ module emu
 	output        VGA_HS,
 	output        VGA_VS,
 	output        VGA_DE,    // = ~(VBlank | HBlank)
+	output        VGA_F1,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        HDMI_CLK,
@@ -74,9 +75,19 @@ module emu
 
 	output [15:0] AUDIO_L,
 	output [15:0] AUDIO_R,
-	output        AUDIO_S    // 1 - signed audio samples, 0 - unsigned
+	output        AUDIO_S,   // 1 - signed audio samples, 0 - unsigned
+
+	// Open-drain User port.
+	// 0 - D+/RX
+	// 1 - D-/TX
+	// 2..6 - USR2..USR6
+	// Set USER_OUT to 1 to read from USER_IN.
+	input   [6:0] USER_IN,
+	output  [6:0] USER_OUT
 );
 
+assign VGA_F1    = 0;
+assign USER_OUT  = '1;
 assign LED_USER  = 0;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
@@ -99,14 +110,15 @@ localparam CONF_STR = {
 ////////////////////   CLOCKS   ///////////////////
 
 wire clk_sys = CLK_50M;
-wire clk_5m;
+wire clk_5m, clk_vid;
 wire pll_locked;
 
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
-	.outclk_0(clk_5m),
+	.outclk_0(clk_vid),
+	.outclk_1(clk_5m),
 	.locked(pll_locked)
 );
 
@@ -114,6 +126,7 @@ pll pll
 
 wire [31:0] status;
 wire  [1:0] buttons;
+wire [21:0] gamma_bus;
 
 wire [64:0] ps2_key;
 
@@ -129,6 +142,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 
 	.buttons(buttons),
 	.status(status),
+	.gamma_bus(gamma_bus),
 
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
@@ -167,27 +181,26 @@ wire m_thrust = btn_thrust | joy[4];
 wire m_fire   = btn_fire   | joy[5];
 wire m_start  = btn_start  | joy[6];
 
-wire blank;
-wire vs,hs;
+wire HBlank, VBlank;
+wire VSync, HSync;
 
-assign VGA_CLK  = clk_5m;
-assign VGA_CE   = 1;
-assign VGA_HS   = hs;
-assign VGA_VS   = vs;
-assign VGA_R    = {r,r};
-assign VGA_G    = {g,g};
-assign VGA_B    = {b,b};
-assign VGA_DE   = ~blank;
+reg ce_pix;
+always @(posedge clk_vid) begin
+	reg [1:0] div;
 
-assign HDMI_CLK = VGA_CLK;
-assign HDMI_CE  = 1;
-assign HDMI_HS  = VGA_HS;
-assign HDMI_VS  = VGA_VS;
-assign HDMI_R   = VGA_R;
-assign HDMI_G   = VGA_G;
-assign HDMI_B   = VGA_B;
-assign HDMI_DE  = VGA_DE;
-assign HDMI_SL  = 0;
+	div <= div + 1'd1;
+	ce_pix <= !div;
+end
+
+arcade_fx #(260,12) arcade_video
+(
+	.*,
+	.clk_video(clk_vid),
+	.RGB_in({r,g,b}),
+
+	.forced_scandoubler(0),
+	.fx(0)
+);
 
 wire [15:0] audio;
 assign AUDIO_L = audio;
@@ -207,9 +220,10 @@ computer_space_top computerspace
 	.signal_fire(m_fire),
 	.signal_start(m_start),
 
-	.hsync(hs),
-	.vsync(vs),
-	.blank(blank),
+	.hsync(HSync),
+	.vsync(VSync),
+	.hblank(HBlank),
+	.vblank(VBlank),
 	.video(video),
 
 	.audio(audio)
@@ -235,10 +249,10 @@ assign b = (bm[5:4] ? 4'b1111 : bm[3:0]) ^ {4{inv}};
 reg inv;
 always @(posedge clk_5m) begin
 	reg old_vs, cur_inv;
-	old_vs <= vs;
+	old_vs <= VSync;
 	
 	cur_inv <= cur_inv | video[3];
-	if (~old_vs & vs) {inv,cur_inv} <= {cur_inv, 1'b0};
+	if (~old_vs & VSync) {inv,cur_inv} <= {cur_inv, 1'b0};
 end
 
 endmodule
