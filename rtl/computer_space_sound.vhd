@@ -48,6 +48,11 @@
 --                       [sum over k_fc 0 to 11]
 --
 --
+-- * Explosion
+--
+--    Randomly frequency-modulated square wave centered at about 100 Hz 
+--    with intermittent noise.
+--
 ---------------------------------------------------------------------------------
 
 library ieee;
@@ -103,9 +108,9 @@ architecture struct of computer_space_sound is
  type t_pond is array(nb_filters) of integer range 0 to 16;
  type t_pond_bank is array(nb_voices) of t_pond;
  constant pond : t_pond_bank := (
-  ( 0, 16, 16, 16,  8,  8,  4,  4,  2,  2,  1,  0), -- voice 1 - rocket thrust
-  (16,  8,  2,  0,  0,  0,  0,  0,  0,  0,  0,  0), -- voice 2 - back ambiance
-  ( 4, 16,  2,  2,  1,  1,  0,  0,  0,  0,  0,  1));-- voice 3 - explosion
+  ( 0, 16, 16, 16,  8,  8,  4,  4,  2,  2,  1,  0 ), -- voice 1 - rocket thrust
+  (16,  8,  2,  0,  0,  0,  0,  0,  0,  0,  0,  0 ), -- voice 2 - back ambiance
+  ( 0,  0,  0,  2,  4,  8,  8,  16, 16, 16, 16, 16));-- voice 3 - explosion background noise
  
  signal add_v : integer range -128*64*16 to 128*64*16-1;
  type t_voices is array(nb_voices) of integer range -128*64*16 to 128*64*16-1;
@@ -118,6 +123,25 @@ architecture struct of computer_space_sound is
  signal saucer_missile : integer range -32768 to 32767;
  signal rocket_missile : integer range -32768 to 32767;
  
+
+ subtype nb_rndmap is integer range 0 to 15;
+
+ type t_period_map is array(nb_rndmap) of integer range 0 to 127;
+ constant period_map : t_period_map := (1,2,3,4,5,6,8,12,18,22,24,25,26,27,28,29);
+
+ type t_delta_map is array(nb_rndmap) of integer range 0 to 8191;
+ constant delta_map : t_delta_map := (500,1000,1500,2000,2500,3000,4000,4000,4500,5000,5500,6000,6500,7000,7500,8000);
+
+ constant amplitude            : integer range -32768 to 32767 := 25000;
+
+ signal rndvalue               : nb_rndmap;
+ signal square_wave            : integer range -32768 to 32767;
+ signal noise_gate             : boolean;
+ signal noisy_square_wave_base : integer range -65536 to 65535;
+ signal noisy_square_wave      : integer range -32768 to 32767;
+ signal explosion_base         : integer range -32768 to 32767;
+
+
  signal explosion_cmd_r : std_logic;
  
 begin
@@ -226,20 +250,78 @@ begin
 		
 	end if;	
 	end if;	
-end process;	   
+end process;
+
+-- explosion wave generation
+square_wave_gen : process(clock_50)
+	variable rise          : boolean                       := false;
+	variable delta         : integer range 0 to 8191       := 0;
+	variable period_cnt    : integer range 0 to 127        := 0;
+begin
+	if reset = '1' then
+		square_wave <= 0;
+		rise := false;
+		delta := 0;
+		period_cnt := 0;
+	else
+		if rising_edge(clock_50) then
+			if noise_cnt = 0 then 	-- it's time to make new sample
+				if rise and (square_wave < amplitude) then          -- rising edge
+					if square_wave + delta > amplitude then
+						square_wave <= amplitude;                   -- upper limit
+					else
+						square_wave <= square_wave + delta;         -- inc value
+					end if;
+				elsif not(rise) and (square_wave > -amplitude) then -- falling edge
+					if square_wave - delta < -amplitude then
+						square_wave <= -amplitude;                  -- lower limit
+					else
+						square_wave <= square_wave - delta;         -- dec value
+					end if;
+				end if;
+				
+				if period_cnt = 70 then                  -- reached the end of half-cycle
+					period_cnt := period_map(rndvalue);  -- random start count for modulating frequency
+					delta := delta_map(rndvalue);        -- random delta value fot obtaining waveform irregularity
+					rise := not(rise);                   -- alternate rise and fall
+					noise_gate <= rndvalue < 6;          -- random gate for intermittent noise
+				else
+					period_cnt := period_cnt + 1;
+				end if;
+			end if;
+		end if;
+	end if;
+end process;
+
+rndvalue <= to_integer(unsigned(noise_reg(3 downto 0))); -- 4-bit random value
+
+noisy_square_wave_base <= square_wave + voices(1) when noise_gate else square_wave; -- add intermittent noise
+
+process(noisy_square_wave_base)	-- clip noise exceeding amplitude
+begin
+	if (noisy_square_wave_base > amplitude) then
+		noisy_square_wave <= amplitude;
+	elsif (noisy_square_wave_base < -amplitude) then
+		noisy_square_wave <= -amplitude;
+	else
+		noisy_square_wave <= noisy_square_wave_base;
+	end if;
+end process;
+
+explosion_base <= noisy_square_wave + voices(2) / 64; -- add extra high-freq small noise
 
 -- quick ADSR to control explosion level enveloppe
 thrust_level : process(clock_50)
 	type t_stage is (s_wait, s_attack, s_decay, s_sustain, s_release);
 	variable stage : t_stage := s_wait;
-	constant attack   : integer range 0 to 32767 := 500;
-   constant decay    : integer range 0 to 32767 := 2000; 
-	constant sustain  : integer range 0 to 32767 := 0;	
-	constant release  : integer range 0 to 32767 := 10000;	
-	constant inc_1    : integer range 0 to 32767 := 65;  -- (    0-32767)/500   ~= 65
-	constant dec_1    : integer range 0 to 32767 := 10;  -- (32767-20000)/2000  ~= 7
-	constant dec_2    : integer range 0 to 32767 := 1;   -- (12767-0    )/10000 ~= 1
-	variable level    : integer range 0 to 32767 := 0; 
+	constant attack   : integer range 0 to 32767 := 250;
+   constant decay    : integer range 0 to 32767 := 200;
+	constant sustain  : integer range 0 to 32767 := 4000;
+	constant release  : integer range 0 to 32767 := 31100;
+	constant inc_1    : integer range 0 to 32767 := 130;
+	constant dec_1    : integer range 0 to 32767 := 7;
+	constant dec_2    : integer range 0 to 32767 := 1;
+	variable level    : integer range 0 to 32767 := 0;
 	variable timer    : integer range 0 to 32767 := 0;
 	variable update_level : std_logic;
 begin
@@ -256,16 +338,18 @@ begin
 					timer := timer - 1;
 				end if;
 			end if;
+
+			-- always wait for explosion trigger
+			explosion_cmd_r <= sound_switch(4);
+			if explosion_cmd_r = '0' and sound_switch(4) = '1' then
+				stage := s_attack;
+				timer := attack; -- set attack duration
+			end if;
 		
 			case stage is
 			
-			when s_wait =>  -- wait for explosion trigger
+			when s_wait =>
 				level := 0;
-				explosion_cmd_r <= sound_switch(4);
-				if explosion_cmd_r = '0' and sound_switch(4) = '1' then
-					stage := s_attack;
-					timer := attack; -- set attack duration
-				end if;
 				
 			when s_attack =>  -- increment level during attack
 				if update_level = '1' then
@@ -304,7 +388,7 @@ begin
 			
 			end case;
 		
-		explosion <= ((voices(2)/2)*level)/32768; -- apply enveloppe
+		explosion <= ((explosion_base/2)*level)/32768; -- apply enveloppe
 		
 		end if;
 		
