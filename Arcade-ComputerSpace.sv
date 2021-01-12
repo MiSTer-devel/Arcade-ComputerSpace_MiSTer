@@ -198,6 +198,7 @@ localparam CONF_STR = {
 	"-;",
 	"R0,Reset;",
 	"J1,Thrust,Fire,Start;",
+	"jn,B,A,Start;",
 	"V,v",`BUILD_DATE
 };
 
@@ -222,8 +223,6 @@ wire [31:0] status;
 wire  [1:0] buttons;
 wire [21:0] gamma_bus;
 
-wire [64:0] ps2_key;
-
 wire [15:0] joystick_0, joystick_1;
 wire [15:0] joy = joystick_0 | joystick_1;
 
@@ -239,41 +238,14 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.gamma_bus(gamma_bus),
 
 	.joystick_0(joystick_0),
-	.joystick_1(joystick_1),
-	.ps2_key(ps2_key)
+	.joystick_1(joystick_1)
 );
 
-wire       pressed = ps2_key[9];
-wire [8:0] code    = ps2_key[8:0];
-always @(posedge clk_sys) begin
-	reg old_state;
-	old_state <= ps2_key[10];
-	
-	if(old_state != ps2_key[10]) begin
-		casex(code)
-			'hX6B: btn_left   <= pressed; // left
-			'hX74: btn_right  <= pressed; // right
-			'h029: btn_thrust <= pressed; // space
-			'h014: btn_fire   <= pressed; // ctrl
-
-			'h005: btn_start  <= pressed; // F1
-			// JPAC/IPAC/MAME Style Codes
-			'h016: btn_start  <= pressed; // 1
-		endcase
-	end
-end
-
-reg btn_right = 0;
-reg btn_left  = 0;
-reg btn_fire  = 0;
-reg btn_thrust= 0;
-reg btn_start = 0;
-
-wire m_left   = btn_left   | joy[1];
-wire m_right  = btn_right  | joy[0];
-wire m_thrust = btn_thrust | joy[4];
-wire m_fire   = btn_fire   | joy[5];
-wire m_start  = btn_start  | joy[6];
+wire m_left   = joy[1];
+wire m_right  = joy[0];
+wire m_thrust = joy[4];
+wire m_fire   = joy[5];
+wire m_start  = joy[6];
 
 wire HBlank, VBlank;
 wire VSync, HSync;
