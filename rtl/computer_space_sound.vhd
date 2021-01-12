@@ -147,7 +147,7 @@ architecture struct of computer_space_sound is
 begin
 
 
-noise : process(clock_50)
+noise : process(clock_50, reset)
 begin
 	if reset = '1' then
 		noise_reg <= X"000000000000ACE1";
@@ -165,7 +165,7 @@ begin
 end process;
 
 -- compute filtered noise and voices
-filter_and_voice : process(clock_50)
+filter_and_voice : process(clock_50, reset)
 	type t_stage is (s_init, s_filter, s_voice);
 	variable stage   : t_stage;
 	variable filter  : nb_filters;
@@ -253,7 +253,7 @@ begin
 end process;
 
 -- explosion wave generation
-square_wave_gen : process(clock_50)
+square_wave_gen : process(clock_50, reset)
 	variable rise          : boolean                       := false;
 	variable delta         : integer range 0 to 8191       := 0;
 	variable period_cnt    : integer range 0 to 127        := 0;
@@ -311,7 +311,7 @@ end process;
 explosion_base <= noisy_square_wave + voices(2) / 64; -- add extra high-freq small noise
 
 -- quick ADSR to control explosion level enveloppe
-thrust_level : process(clock_50)
+thrust_level : process(clock_50, reset)
 	type t_stage is (s_wait, s_attack, s_decay, s_sustain, s_release);
 	variable stage : t_stage := s_wait;
 	constant attack   : integer range 0 to 32767 := 250;

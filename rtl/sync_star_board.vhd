@@ -331,7 +331,7 @@ sync_and_stars: component scan_counter
 
 a1_15 <= star_video; 
 SB_H 	<= count_enable;
-c4_14 <= count_enable;
+--c4_14 <= count_enable;
 
 -----------------------------------------------------------------------------
 -- Assign counter value from scan counters											--	
