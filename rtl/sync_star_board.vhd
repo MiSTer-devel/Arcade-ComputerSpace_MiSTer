@@ -239,7 +239,7 @@ signal a5_3_1, b5_3_1, b5_11_13,
 -- signals for start/end game
 -- circuitry logic
 signal SB_D, SB_B 								: std_logic;
---signal SB_7_old 						: std_logic :='1';
+signal SB_7_old 						: std_logic :='1';
 signal SB_C_old 						: std_logic :='1';
 
 -- game clock
@@ -1254,7 +1254,7 @@ if reset = '1' then
 	e5_12 <= '0';
 	d6_8 <= '0';
 elsif rising_edge (super_clk) then
-	--SB_7_old <= SB_7;
+	SB_7_old <= SB_7;
 	SB_C_old <= SB_C;
 	
 	case state is
@@ -1269,10 +1269,10 @@ elsif rising_edge (super_clk) then
 		when COIN_INSERTED =>   
 			d6_8 <= '1';
 			e5_12 <= '1';
-			--if SB_7_old = '0' and SB_7 = '1' then 
+			if SB_7_old = '0' and SB_7 = '1' then 
 				d6_8 <= '0';
 				state <= GAME_ON;
-			--end if;		
+			end if;		
 			
 		when GAME_ON =>  
 			d6_8 <= '1';

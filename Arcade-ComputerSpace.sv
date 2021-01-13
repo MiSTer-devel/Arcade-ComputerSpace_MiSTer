@@ -197,8 +197,8 @@ localparam CONF_STR = {
 	"O2,Color,No,Yes;",
 	"-;",
 	"R0,Reset;",
-	"J1,Thrust,Fire,Start;",
-	"jn,B,A,Start;",
+	"J1,Thrust,Fire,Start,Coin;",
+	"jn,B,A,Start,R;",
 	"V,v",`BUILD_DATE
 };
 
@@ -246,6 +246,7 @@ wire m_right  = joy[0];
 wire m_thrust = joy[4];
 wire m_fire   = joy[5];
 wire m_start  = joy[6];
+wire m_coin   = joy[7];
 
 wire HBlank, VBlank;
 wire VSync, HSync;
@@ -285,6 +286,7 @@ computer_space_top computerspace
 	.signal_thrust(m_thrust),
 	.signal_fire(m_fire),
 	.signal_start(m_start),
+	.signal_coin(m_coin),
 
 	.hsync(HSync),
 	.vsync(VSync),
