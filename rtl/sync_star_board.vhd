@@ -83,11 +83,13 @@ entity sync_star_board is
 							-- rocket missile  
 	SB_7,					-- "start button pressed" signal
 	SB_C,					-- "coin inserted" signal
+	SB_D,					-- 2PlayPerCoin SW
 	SB_E,					-- Rocket Enable 
 							-- signals that the TV beam
 							-- is "sweeping" by the current 
 							-- position of the 16 x 16 pixel
 							-- rocket image grid
+	SB_F,					-- Replay SW
 	SB_N					-- rocket & saucer video mix signal
 																				: in std_logic;   
 	
@@ -142,11 +144,6 @@ component scan_counter is
 	vertical, horizontal 						: out std_logic_vector (7 downto 0)
 	);
 end component;
-
--- statemachine for coin detection,
--- start game and indicate "game on" 
-type STATE_TYPE is
-(IDLE, COIN_INSERTED, GAME_ON);
 
 signal count_enable, a1_15, c4_14 			: std_logic;
 
@@ -208,8 +205,6 @@ signal a2_3, a2_4, a2_5, a2_6,
 		 a2_13, a2_15 								: std_logic;
 signal c2_11 										: std_logic;
 
-signal SB_F 										: std_logic;
-
 -- signals for explosion circuitry logic
 signal a6_8, h2_1, a6_3, a6_11,
 		 a6_6, e2_13, e2_4,
@@ -238,8 +233,8 @@ signal a5_3_1, b5_3_1, b5_11_13,
 
 -- signals for start/end game
 -- circuitry logic
-signal SB_D, SB_B 								: std_logic;
---signal SB_7_old 						: std_logic :='1';
+signal SB_B 								: std_logic;
+signal SB_7_old 						: std_logic :='1';
 signal SB_C_old 						: std_logic :='1';
 
 -- game clock
@@ -259,9 +254,7 @@ signal d5_6 										: std_logic :='1';
 signal d5_13, d5_11, d5_12, d5_10 			: std_logic;
 signal d5_9 										: std_logic := '0';
 signal d5_8 										: std_logic := '1';
-signal c6_5, c6_6, c6_1 						: std_logic;
-
-signal state 										: STATE_TYPE := IDLE;
+signal c6_5, c6_5_old, c6_6, c6_1, c6_1_old			: std_logic;
 
 -- signals to manage asynchronous
 -- clock design embedded in
@@ -1232,63 +1225,156 @@ a2_15 <= '1' when a2_A > a2_B else '0';
 -----------------------------------------------------------------------------
 -- REPLAY CIRCUITRY:	Set Replay or not													-- 
 --																									--
--- SB_F = '1'; flag allows for replay													--
+-- SB_F connected to switch allows for replay													--
 -----------------------------------------------------------------------------
-SB_F <= '1';
 c2_11 <= SB_F and a2_15; -- determine replay or not, depending on score
 
+
 -----------------------------------------------------------------------------
--- START/END GAME: Start Game Process													--
---																									--
--- start game circuitry is not fully reproduced										--
--- a "state machine" represents the logic												--
---																									--	
--- SB_7 connected to Start button  on player control panel.						--
---																									--
--- SB_C connected to coin microswitch													--
------------------------------------------------------------------------------	
+-- START/END GAME: Coin Latch
+--
+-- A tricky latch constructed with relay and transistor(Q13).
+--
+-- The actual output is active low but it is only used via inverter e5_12,
+-- at last it turns active high.
+--
+-- Note: This digital reproduction directly outputs inverted e5_12 signal.
+--
+-- e5_12 determines whether or not the game can be started
+-- when the start button is pressed via RS flip-flop(d6_8).
+--
+-- Also it is used to keep reset the following two D-FFs until a coin inserted.
+--  d5_6(Replay Flag)
+--  d5_9(Game On/Off Flag)
+--
+--
+-- Transition of actual output (and e5_12):
+--
+-- < Initial state: High (e5_12: Low) >
+-- Because CoinSwitchNO is open(or VCC), there is no current through relay.
+-- So relay is open, resulting output keeping high.
+--
+-- < Transition to Low (e5_12: High) >
+-- Once a coin inserted(that is, CoinSwitchNO falls GND), relay turns on (closes).
+-- Transistor(Q13) is always conducted state to GND except latch clear signal(c5_3)
+-- is turns low at the end of the game.
+-- Therefore, when relay closes, the latch output stuck GND via Q13,
+-- even though CoinSwitchNO is back to high.
+--
+-- < Transition to High (e5_12: Low) >
+-- When the game is over, latch clear signal(c5_3) turns low,
+-- resulting transistor(Q13) to be non-conducting state.
+-- Then CoinSwitchNO turns high, relay turns off(opens),
+-- and the latch output keeps high after that.
+--
+--
+-- SB_C connected to coin microswitch
+-- e5_12 is inverted latch output
+-----------------------------------------------------------------------------
 process (super_clk, reset)
 begin
 if reset = '1' then
-	state <= IDLE;
 	e5_12 <= '0';
-	d6_8 <= '0';
 elsif rising_edge (super_clk) then
-	--SB_7_old <= SB_7;
-	SB_C_old <= SB_C;
-	
+	if SB_C = '1' then
+		e5_12 <= '1';
+	elsif c5_3 = '0' then
+		e5_12 <= '0';
+	end if;
+end if;
+end process;
+
+-----------------------------------------------------------------------------
+-- START/END GAME: Coin Latch Clear
+--
+-- 1. C6(74121 monostable multivibrator) outputs about 280,000 ns pulse -
+--    triggered by rising edge of c6_5 (game end)
+--
+-- 2. A5(7474 D-FF) outputs
+--    * 2playpercoin sw is off
+--        always high
+--    * 2playpercoin sw is on
+--        alternate high and low changing at the end of each game end 
+--
+-- 3. C5_3(NAND gates) outputs
+--    * 2playpercoin sw is off
+--        coin latch clear pulse(active low) at every game end
+--    * 2playpercoin sw is on
+--        coin latch clear pulse(active low) once every two times at game end
+--
+-- SB_D connected to 2 Play per coin SW
+-- c5_3 is coin latch clear signal (active low)
+-----------------------------------------------------------------------------
+C6_74121 : process (super_clk, reset)
+	type t_state is (IDLE, COUNT);
+	variable state : t_state := IDLE;
+	constant cnt_end : integer range 0 to 16383 := 14000; -- 280,000 ns / 20 ns
+	variable cnt : integer range 0 to 16383;
+begin
+if reset = '1' then
+	c6_6 <= '0';
+	c6_1 <= '1';
+	state := IDLE;
+	cnt := 0;
+elsif rising_edge (super_clk) then
+	c6_5_old <= c6_5;
 	case state is
 		when IDLE =>
-			e5_12 <= '0';
-			d6_8 <= '1';
-			if SB_C_old = '0' and SB_C = '1' then
-				e5_12 <= '1';
-				state <= COIN_INSERTED;
+			c6_6 <= '0';
+			c6_1 <= '1';
+			if (c6_5_old = '0' and c6_5 = '1') then
+				state := COUNT;
+				cnt := 0;
 			end if;
-		
-		when COIN_INSERTED =>   
-			d6_8 <= '1';
-			e5_12 <= '1';
-			--if SB_7_old = '0' and SB_7 = '1' then 
-				d6_8 <= '0';
-				state <= GAME_ON;
-			--end if;		
-			
-		when GAME_ON =>  
-			d6_8 <= '1';
-			e5_12 <= '1';
-			if d5_9 = '0' then
-				state <= IDLE;
-				e5_12 <= '0';			
-			end if;		
-
-		when others =>          
-			state <= IDLE;
-			e5_12 <= '0';
-			d6_8 <= '1';
-				
+		when COUNT =>
+			c6_6 <= '1';
+			c6_1 <= '0';
+			cnt := cnt + 1;
+			if (cnt = cnt_end) then
+				state := IDLE;
+			end if;
+		when others =>
+			state := IDLE;
 	end case;
-end if;	
+end if;
+end process;
+
+A5_7474 : process (super_clk, reset, SB_D)
+begin
+if reset = '1' then
+	a5_9 <= '0';
+elsif SB_D = '0' then
+	a5_9 <= '1';
+elsif rising_edge (super_clk) then
+	c6_1_old <= c6_1;
+	if (c6_1_old = '0' and c6_1 = '1') then
+		a5_9 <= not(a5_9);
+	end if;
+end if;
+end process;
+
+c5_3 <= not(c6_6 and a5_9);
+
+-----------------------------------------------------------------------------
+-- START/END GAME: Start Button Latch
+--
+-- RS-FF made of 4-Input NAND to make start game pulse(active low)
+--
+-- Outputs low while start button is pressed, otherwise outputs high.
+--
+-- Pressing start button is ignored in the following conditions
+-- * Coin latch output (e5_12) is low, which means no credit
+-- * Inverted game on/off flag(d5_8) is low, which means game has already started
+--
+-- SB_7 connected to Start button  on player control panel.
+-- d6_8 outputs game start pulse(active low)
+-----------------------------------------------------------------------------
+process (SB_7, e5_12, d5_8) begin
+	if (SB_7 = '1' and e5_12 = '1' and d5_8 = '1') then
+		d6_8 <= '0';
+	else
+		d6_8 <= '1';
+	end if;
 end process;
 
 -----------------------------------------------------------------------------
@@ -1354,6 +1440,8 @@ begin
 		end if;
 	end if;
 end process;
+
+c6_5 <= d5_8;
 
 -----------------------------------------------------------------------------
 -- START/END GAME: Reset Score and Time (Unit and Tens)							--

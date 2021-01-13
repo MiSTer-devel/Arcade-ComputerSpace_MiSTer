@@ -98,6 +98,10 @@ entity computer_space_top is
 		signal_thrust 	: in  std_logic;
 		signal_fire 	: in  std_logic;
 		signal_start 	: in  std_logic;
+		signal_coin     : in  std_logic;
+
+		sw_2playpercoin : in  std_logic;
+		sw_replay       : in  std_logic;
 
 		hsync				: out std_logic;
 		vsync				: out std_logic;
@@ -142,6 +146,7 @@ component computer_space_logic is
 	signal_start, signal_coin, 
 	signal_thrust, signal_fire,
 	signal_cw, signal_ccw  						: in std_logic;
+	sw_2playpercoin, sw_replay					: in std_logic;
 	composite_video_signal					 	: out std_logic_vector(3 downto 0);
 	hblank,vblank									: out std_logic;
 	hsync												: out std_logic;
@@ -229,8 +234,8 @@ port map
 rocket_missile_life_time_duration, saucer_missile_life_time_duration,
 saucer_missile_hold_duration, signal_delay_duration,
 thrust_and_rotate_clk, explosion_rotate_clk, 
-signal_start, signal_start, signal_thrust, signal_fire,
-signal_cw,signal_ccw, video, hblank, vblank,
+signal_start, signal_coin, signal_thrust, signal_fire,
+signal_cw,signal_ccw, sw_2playpercoin, sw_replay, video, hblank, vblank,
 hsync, vsync,
 audio_gate, sound_switch, saucer_missile_sound,rocket_missile_sound,
 turn_sound

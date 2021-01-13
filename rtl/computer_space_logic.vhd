@@ -51,6 +51,9 @@ entity computer_space_logic is
 	signal_start, signal_coin,
 	signal_thrust, signal_fire,
 	signal_cw, signal_ccw  						: in std_logic;
+
+	-- setting switches
+	sw_2playpercoin, sw_replay					: in std_logic;
 	
 	-- composite video
 	-- signals; to send via gpio
@@ -86,7 +89,7 @@ component sync_star_board
 	explosion_clk, seconds_clk					: in std_logic; 
 
 	SB_3, SB_4, SB_6, SB_7,
-	SB_C, SB_E, SB_N								: in std_logic;  	
+	SB_C, SB_D, SB_E, SB_F, SB_N						: in std_logic;  	
 
 	SB_2, SB_5, SB_H, SB_K,
 	SB_L, SB_M, SB_Y 								: out std_logic;  
@@ -149,7 +152,7 @@ end component;
 -- signals for interfacing
 -- with sync star board
 signal SB_3, SB_4, SB_6,
-		 SB_C, SB_E, SB_N							: std_logic;   
+		 SB_C, SB_D, SB_E, SB_F, SB_N				: std_logic;   
 signal SB_2, SB_5, SB_7,
 		 SB_H, SB_K, SB_L, SB_M, SB_Y			: std_logic;   
 
@@ -193,7 +196,7 @@ begin
 -----------------------------------------------------------------------------
 Sync_Star_Brd : sync_star_board 
 port map (reset, game_clk, super_clk, explosion_clk, seconds_clk,
-SB_3, SB_4, SB_6, SB_7, SB_C, SB_E, SB_N,
+SB_3, SB_4, SB_6, SB_7, SB_C, SB_D, SB_E, SB_F, SB_N,
 SB_2, SB_5, SB_H, SB_K, SB_L, SB_M, SB_Y, hsync, vsync,
 composite_video_signal, hblank, vblank);
 
@@ -353,5 +356,11 @@ sound_switch (3) <= MB_2_rocket; 	-- rocket missile shooting
 sound_switch (4) <= MemBrd_22; 		-- explosion
 sound_switch (5) <= MB_2_saucer;		-- saucer missile shooting	
 sound_switch (6) <= '0';
+
+-----------------------------------------------------------------------------
+-- CONNECTING TO SETTING SWITCHES
+-----------------------------------------------------------------------------
+SB_D <= sw_2playpercoin;
+SB_F <= sw_replay;
 
 end computer_space_logic_architecture;

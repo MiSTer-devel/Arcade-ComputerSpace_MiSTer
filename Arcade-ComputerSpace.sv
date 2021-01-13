@@ -196,9 +196,11 @@ localparam CONF_STR = {
 	"O34,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O2,Color,No,Yes;",
 	"-;",
+  "DIP;",
+	"-;",
 	"R0,Reset;",
-	"J1,Thrust,Fire,Start;",
-	"jn,B,A,Start;",
+	"J1,Thrust,Fire,Start,Coin;",
+	"jn,B,A,Start,R;",
 	"V,v",`BUILD_DATE
 };
 
@@ -226,6 +228,11 @@ wire [21:0] gamma_bus;
 wire [15:0] joystick_0, joystick_1;
 wire [15:0] joy = joystick_0 | joystick_1;
 
+wire        ioctl_wr;
+wire [26:0] ioctl_addr;
+wire  [7:0] ioctl_dout;
+wire [15:0] ioctl_index;
+
 hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -237,6 +244,11 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.status(status),
 	.gamma_bus(gamma_bus),
 
+	.ioctl_wr,
+	.ioctl_addr,
+	.ioctl_dout,
+	.ioctl_index,
+
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1)
 );
@@ -246,6 +258,16 @@ wire m_right  = joy[0];
 wire m_thrust = joy[4];
 wire m_fire   = joy[5];
 wire m_start  = joy[6];
+wire m_coin   = joy[7];
+
+// Load DIP-SW
+reg [7:0] dipsw[8];
+always @(posedge clk_sys) begin
+  if (ioctl_wr && (ioctl_index==254) && !ioctl_addr[24:3])
+    dipsw[ioctl_addr[2:0]] <= ioctl_dout;
+end
+wire sw_2playpercoin = dipsw[0][0];
+wire sw_replay = dipsw[0][1];
 
 wire HBlank, VBlank;
 wire VSync, HSync;
@@ -285,6 +307,10 @@ computer_space_top computerspace
 	.signal_thrust(m_thrust),
 	.signal_fire(m_fire),
 	.signal_start(m_start),
+	.signal_coin(m_coin),
+
+	.sw_2playpercoin(sw_2playpercoin),
+	.sw_replay(sw_replay),
 
 	.hsync(HSync),
 	.vsync(VSync),
