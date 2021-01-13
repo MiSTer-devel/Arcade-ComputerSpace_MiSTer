@@ -7,5 +7,9 @@
 	<manufacturer>Syzygy Engineering</manufacturer>
 	<category>Simulation</category>
 	<rbf>computerspace</rbf>
+	<switches default="02">
+		<dip bits="0" name="2PlayPerCoin" ids="Off,On"/>
+		<dip bits="1" name="Replay" ids="Off,On"/>
+	</switches>
 	<buttons names="Thrust,Fire,Start,Coin" default="B,A,Start,R"/>
 </misterromdescription>
