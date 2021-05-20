@@ -104,6 +104,8 @@ localparam CONF_STR = {
 	"-;",
 	"R0,Reset;",
 	"J1,Thrust,Fire,Start;",
+	"jn,A,B,Start;",
+	"jp,B,A,Start;",
 	"V,v",`BUILD_DATE
 };
 
